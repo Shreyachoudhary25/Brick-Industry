@@ -31,12 +31,26 @@ export default function Quote() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    console.log("Wholesale RFQ Submitted:", formData);
-    setIsSubmitted(true);
-  };
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const response = await fetch('http://localhost:5000/api/quotes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData)
+    });
+
+    if (response.ok) {
+      setIsSubmitted(true);
+    } else {
+      const errData = await response.json();
+      alert(errData.error || 'Failed to submit quote.');
+    }
+  } catch (err) {
+    console.error('Network error:', err);
+    alert('Unable to reach server. Please ensure the backend is running.');
+  }
+};
 
   return (
     <div className="quote-page">

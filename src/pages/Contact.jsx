@@ -12,11 +12,26 @@ export default function Contact() {
   });
   const [sent, setSent] = useState(false);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log("Contact Message:", formData);
-    setSent(true);
-  };
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const response = await fetch('http://localhost:5000/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData)
+    });
+
+    if (response.ok) {
+      setSent(true);
+    } else {
+      const errData = await response.json();
+      alert(errData.error || 'Failed to submit inquiry.');
+    }
+  } catch (err) {
+    console.error('Network error:', err);
+    alert('Unable to reach server. Please ensure the backend is running.');
+  }
+};
 
   return (
     <div className="contact-page">
