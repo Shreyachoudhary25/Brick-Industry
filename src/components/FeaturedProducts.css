@@ -1,0 +1,37 @@
+.featured-products-section {
+  padding: 5rem 1.5rem;
+  background-color: var(--color-off-white);
+}
+
+.featured-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 3rem;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.link-view-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  color: var(--color-brick-red);
+  transition: gap 0.2s ease;
+}
+
+.link-view-all:hover {
+  gap: 0.65rem;
+}
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 2rem;
+}

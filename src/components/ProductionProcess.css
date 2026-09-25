@@ -1,0 +1,70 @@
+.process-section {
+  padding: 5rem 1.5rem;
+  background-color: var(--color-dark);
+  color: var(--color-off-white);
+}
+
+.process-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.process-header {
+  text-align: center;
+  max-width: 650px;
+  margin: 0 auto 4rem auto;
+}
+
+.process-title {
+  font-size: clamp(1.8rem, 3vw, 2.3rem);
+  font-weight: 800;
+  color: var(--color-off-white);
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.process-subtitle {
+  color: rgba(250, 249, 246, 0.7);
+  font-size: 1rem;
+}
+
+.process-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.step-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 2rem 1.25rem;
+  position: relative;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.step-card:hover {
+  border-color: var(--color-brick-red);
+  transform: translateY(-3px);
+}
+
+.step-badge {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--color-brick-red);
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.step-heading {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+  color: var(--color-off-white);
+}
+
+.step-detail {
+  font-size: 0.85rem;
+  color: rgba(250, 249, 246, 0.65);
+  line-height: 1.55;
+}
