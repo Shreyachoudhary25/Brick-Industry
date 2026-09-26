@@ -19,6 +19,10 @@ export default function Navbar() {
           <span className="brand-name">JBBT<span>BI</span></span>
         </Link>
 
+        <NavLink to="/calculator" className="nav-link">
+  Calculator
+</NavLink>
+
         <nav className="nav-links">
           <NavLink to="/" end className={({ isActive }) => (isActive ? 'active-link' : '')}>
             Home

@@ -1,11 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Send, CheckCircle2, Phone, Mail, MapPin } from 'lucide-react';
+import { useSearchParams, useLocation } from 'react-router-dom';
+import {
+  Send,
+  CheckCircle2,
+  Phone,
+  Mail,
+  MapPin,
+  Calculator as CalcIcon,
+  Download,
+  RotateCcw
+} from 'lucide-react';
 import { products } from '../data/products';
+import { generateQuotePDF } from '../utils/generateQuotePDF';
 import './Quote.css';
 
 export default function Quote() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+
   const preselectedProduct = searchParams.get('product') || '';
 
   const [formData, setFormData] = useState({
@@ -18,39 +30,93 @@ export default function Quote() {
     notes: ''
   });
 
+  const [isCalculatedEstimate, setIsCalculatedEstimate] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [createdQuoteId, setCreatedQuoteId] = useState('');
 
+  // Pre-select product via query param (?product=...)
   useEffect(() => {
     if (preselectedProduct) {
       setFormData((prev) => ({ ...prev, productName: preselectedProduct }));
     }
   }, [preselectedProduct]);
 
+  // Read data passed from the Masonry Calculator (/calculator)
+  useEffect(() => {
+    if (location.state) {
+      const { productName, quantity, notes } = location.state;
+      setFormData((prev) => ({
+        ...prev,
+        productName: productName || prev.productName,
+        quantity: quantity ? String(quantity) : prev.quantity,
+        notes: notes || prev.notes
+      }));
+      if (quantity) {
+        setIsCalculatedEstimate(true);
+      }
+    }
+  }, [location.state]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  try {
-    const response = await fetch('http://localhost:5000/api/quotes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
-    });
+  const handleDownloadEstimate = () => {
+    // Determine unit price based on matched product catalog rate or fallback standard
+    const matchedProduct = products.find((p) => p.name === formData.productName);
+    const resolvedPrice = matchedProduct?.pricePerUnit || 9.5;
 
-    if (response.ok) {
-      setIsSubmitted(true);
-    } else {
-      const errData = await response.json();
-      alert(errData.error || 'Failed to submit quote.');
+    generateQuotePDF({
+      quoteId: createdQuoteId || undefined,
+      fullName: formData.fullName,
+      phone: formData.phone,
+      email: formData.email,
+      productName: formData.productName,
+      quantity: formData.quantity,
+      deliverySite: formData.deliverySite,
+      notes: formData.notes,
+      unitPrice: resolvedPrice
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('http://localhost:5000/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCreatedQuoteId(data.quoteId || '');
+        setIsSubmitted(true);
+      } else {
+        const errData = await response.json();
+        alert(errData.error || 'Failed to submit quote.');
+      }
+    } catch (err) {
+      console.error('Network error:', err);
+      alert('Unable to reach server. Please ensure the backend is running.');
     }
-  } catch (err) {
-    console.error('Network error:', err);
-    alert('Unable to reach server. Please ensure the backend is running.');
-  }
-};
+  };
+
+  const resetForm = () => {
+    setIsSubmitted(false);
+    setIsCalculatedEstimate(false);
+    setCreatedQuoteId('');
+    setFormData({
+      fullName: '',
+      phone: '',
+      email: '',
+      productName: '',
+      quantity: '10000',
+      deliverySite: '',
+      notes: ''
+    });
+  };
 
   return (
     <div className="quote-page">
@@ -71,32 +137,81 @@ export default function Quote() {
         <div className="quote-grid">
           
           <div className="quote-form-card">
+            {isCalculatedEstimate && !isSubmitted && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  backgroundColor: '#F5EBDD',
+                  borderLeft: '4px solid #A63D2F',
+                  padding: '0.85rem 1rem',
+                  borderRadius: '4px',
+                  marginBottom: '1.5rem',
+                  color: '#4A2C23',
+                  fontSize: '0.9rem'
+                }}
+              >
+                <CalcIcon size={20} color="#A63D2F" />
+                <span>
+                  <strong>Masonry Estimator Applied:</strong> Quantities and specification notes have been automatically populated below.
+                </span>
+              </div>
+            )}
+
             {isSubmitted ? (
               <div className="quote-success">
                 <CheckCircle2 size={48} color="#A63D2F" />
                 <h2>Quotation Request Received</h2>
                 <p>
                   Thank you, <strong>{formData.fullName}</strong>. Our dispatch and sales team 
-                  will review your requirements for <strong>{formData.quantity} units</strong> and 
-                  contact you via phone/email within 4 business hours with an official proforma invoice.
+                  will review your requirements for <strong>{Number(formData.quantity).toLocaleString()} units</strong> of{' '}
+                  <strong>{formData.productName || 'Bricks'}</strong> and contact you within 4 business hours with an official proforma invoice.
                 </p>
-                <button 
-                  className="btn-primary" 
-                  onClick={() => {
-                    setIsSubmitted(false);
-                    setFormData({
-                      fullName: '',
-                      phone: '',
-                      email: '',
-                      productName: '',
-                      quantity: '10000',
-                      deliverySite: '',
-                      notes: ''
-                    });
-                  }}
-                >
-                  Submit Another RFQ
-                </button>
+
+                {/* PDF Generation & Action Bridge */}
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap', margin: '2rem 0 1rem 0' }}>
+                  <button
+                    type="button"
+                    onClick={handleDownloadEstimate}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      backgroundColor: '#4A2C23',
+                      color: '#FFF',
+                      border: 'none',
+                      padding: '0.85rem 1.4rem',
+                      borderRadius: '4px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(74, 44, 35, 0.25)',
+                      transition: 'background 0.2s'
+                    }}
+                  >
+                    <Download size={18} /> Download Proforma PDF
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      backgroundColor: '#F4EFEA',
+                      color: '#4A2C23',
+                      border: '1px solid #D9CFC4',
+                      padding: '0.85rem 1.4rem',
+                      borderRadius: '4px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'background 0.2s'
+                    }}
+                  >
+                    <RotateCcw size={16} /> Submit Another RFQ
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="rfq-form">
@@ -155,22 +270,44 @@ export default function Quote() {
                           {p.name} ({p.strength})
                         </option>
                       ))}
+                      {formData.productName && !products.some((p) => p.name === formData.productName) && (
+                        <option value={formData.productName}>{formData.productName}</option>
+                      )}
                       <option value="Custom Specification">Custom Specification / Multiple Products</option>
                     </select>
                   </div>
 
                   <div className="form-group">
                     <label>Estimated Quantity (Units) *</label>
-                    <select
-                      name="quantity"
-                      value={formData.quantity}
-                      onChange={handleChange}
-                    >
-                      <option value="5000">5,000 Units (Half Truckload)</option>
-                      <option value="10000">10,000 Units (Standard Truckload)</option>
-                      <option value="25000">25,000 Units (Multi-Truck)</option>
-                      <option value="50000+">50,000+ Units (Commercial Contract)</option>
-                    </select>
+                    {isCalculatedEstimate ? (
+                      <input
+                        type="number"
+                        name="quantity"
+                        required
+                        min="1"
+                        value={formData.quantity}
+                        onChange={handleChange}
+                        style={{
+                          width: '100%',
+                          padding: '0.75rem',
+                          border: '2px solid #A63D2F',
+                          borderRadius: '4px',
+                          fontWeight: 600,
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    ) : (
+                      <select
+                        name="quantity"
+                        value={formData.quantity}
+                        onChange={handleChange}
+                      >
+                        <option value="5000">5,000 Units (Half Truckload)</option>
+                        <option value="10000">10,000 Units (Standard Truckload)</option>
+                        <option value="25000">25,000 Units (Multi-Truck)</option>
+                        <option value="50000+">50,000+ Units (Commercial Contract)</option>
+                      </select>
+                    )}
                   </div>
                 </div>
 
@@ -237,6 +374,7 @@ export default function Quote() {
               </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>
