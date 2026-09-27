@@ -1,7 +1,13 @@
-import { API_BASE_URL } from '../config';
 import React, { useState } from 'react';
 import { Mail, Phone, MapPin, Clock, Send, CheckCircle2 } from 'lucide-react';
+import { API_BASE_URL as CONFIG_API_URL } from '../config';
 import './Contact.css';
+
+// Fall back directly to your live Render backend if config is local or empty
+const BACKEND_URL =
+  CONFIG_API_URL && !CONFIG_API_URL.includes('localhost')
+    ? CONFIG_API_URL
+    : 'https://jbbtbi.onrender.com';
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -9,30 +15,43 @@ export default function Contact() {
     phone: '',
     email: '',
     subject: '',
-    message: ''
+    message: '',
   });
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [refId, setRefId] = useState('');
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/contact`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
-    });
+    e.preventDefault();
+    setLoading(true);
 
-    if (response.ok) {
-      setSent(true);
-    } else {
-      const errData = await response.json();
-      alert(errData.error || 'Failed to submit inquiry.');
+    const targetUrl = `${BACKEND_URL}/api/contact`;
+    console.log('📡 Submitting inquiry to:', targetUrl);
+
+    try {
+      const response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (data.messageId) {
+          setRefId(data.messageId.slice(-6));
+        }
+        setSent(true);
+      } else {
+        alert(data.error || 'Failed to submit inquiry.');
+      }
+    } catch (err) {
+      console.error('Network error:', err);
+      alert('Unable to reach server. Please ensure the backend is running.');
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error('Network error:', err);
-    alert('Unable to reach server. Please ensure the backend is running.');
-  }
-};
+  };
 
   return (
     <div className="contact-page">
@@ -43,7 +62,7 @@ export default function Contact() {
           </span>
           <h1 className="banner-title">Contact Plant & Sales Desk</h1>
           <p className="banner-desc">
-            Connect directly with plant managers and dispatch coordinators for site deliveries, 
+            Connect directly with plant managers and dispatch coordinators for site deliveries,
             technical test sheets, and proforma inquiries.
           </p>
         </div>
@@ -51,11 +70,10 @@ export default function Contact() {
 
       <div className="contact-container">
         <div className="contact-grid">
-          
           <div className="contact-info-col">
             <h2>Plant & Office Locations</h2>
             <p className="contact-subtext">
-              We welcome structural engineers, architects, and contractors for on-site kiln and 
+              We welcome structural engineers, architects, and contractors for on-site kiln and
               quality lab inspections during operating hours.
             </p>
 
@@ -95,21 +113,26 @@ export default function Contact() {
             </div>
           </div>
 
-    
           <div className="contact-form-card">
             {sent ? (
               <div className="contact-success">
                 <CheckCircle2 size={44} color="#A63D2F" />
                 <h3>Message Received</h3>
+                {refId && (
+                  <p style={{ fontWeight: 'bold', color: 'var(--color-rust, #A63D2F)' }}>
+                    Inquiry Reference: #{refId}
+                  </p>
+                )}
                 <p>
-                  Thank you for reaching out. A logistics coordinator from our sales desk will 
+                  Thank you for reaching out. A logistics coordinator from our sales desk will
                   contact you directly via phone or email shortly.
                 </p>
-                <button 
-                  className="btn-secondary" 
+                <button
+                  className="btn-secondary"
                   style={{ color: 'var(--color-dark)', borderColor: 'var(--color-deep-brown)' }}
                   onClick={() => {
                     setSent(false);
+                    setRefId('');
                     setFormData({ name: '', phone: '', email: '', subject: '', message: '' });
                   }}
                 >
@@ -177,8 +200,13 @@ export default function Contact() {
                   ></textarea>
                 </div>
 
-                <button type="submit" className="btn-primary" style={{ justifyContent: 'center' }}>
-                  Send Inquiry <Send size={16} />
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{ justifyContent: 'center' }}
+                  disabled={loading}
+                >
+                  {loading ? 'Sending...' : 'Send Inquiry'} <Send size={16} />
                 </button>
               </form>
             )}
