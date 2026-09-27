@@ -1,6 +1,5 @@
 import express from "express";
 import mongoose from "mongoose";
-import cors from "cors";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -18,32 +17,30 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Permissive CORS configuration to accept requests from Vercel & localhost
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://brick-industry.vercel.app",
-  process.env.CLIENT_URL,
-].filter(Boolean);
+// Universal CORS & Preflight Handler
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+  );
 
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow non-browser requests or any origin matching our domains / wildcard
-    if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    // Also allow any preview deployments on Vercel
-    if (origin.endsWith(".vercel.app")) {
-      return callback(null, true);
-    }
-    return callback(null, true); // Fallback: allow to prevent production blockages
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-};
-
-app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+  // Directly respond to browser preflight checks
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+  next();
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -95,6 +92,8 @@ const quoteSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const Quote = mongoose.model("Quote", quoteSchema);
+
 // Product Schema & Model
 const productSchema = new mongoose.Schema(
   {
@@ -116,7 +115,6 @@ const productSchema = new mongoose.Schema(
 );
 
 const Product = mongoose.model("Product", productSchema);
-const Quote = mongoose.model("Quote", quoteSchema);
 
 // Public Contact Route
 app.post("/api/contact", async (req, res) => {
@@ -321,7 +319,7 @@ app.delete("/api/admin/inquiries/:id", protect, async (req, res) => {
   }
 });
 
-// Product CRUD Endpoints
+// Product Endpoints
 app.get("/api/products", async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 });
