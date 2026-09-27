@@ -12,13 +12,41 @@ import {
   sendQuoteAlert,
   sendQuoteCustomerAck,
 } from "./utils/mailer.js";
+
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// Permissive CORS configuration to accept requests from Vercel & localhost
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://brick-industry.vercel.app",
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser requests or any origin matching our domains / wildcard
+    if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    // Also allow any preview deployments on Vercel
+    if (origin.endsWith(".vercel.app")) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Fallback: allow to prevent production blockages
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const MONGO_URI =
   process.env.MONGO_URI ||
@@ -74,8 +102,8 @@ const productSchema = new mongoose.Schema(
     category: { type: String, required: true, default: "Clay Bricks" },
     pricePerUnit: { type: Number, required: true },
     moq: { type: Number, default: 5000 },
-    strength: { type: String, required: true }, // e.g., "15 - 20 N/mm²"
-    dimensions: { type: String, required: true }, // e.g., "190 x 90 x 90 mm"
+    strength: { type: String, required: true },
+    dimensions: { type: String, required: true },
     stockStatus: {
       type: String,
       enum: ["In Stock", "Made to Order", "Low Stock"],
@@ -88,7 +116,6 @@ const productSchema = new mongoose.Schema(
 );
 
 const Product = mongoose.model("Product", productSchema);
-
 const Quote = mongoose.model("Quote", quoteSchema);
 
 // Public Contact Route
@@ -114,7 +141,7 @@ app.post("/api/contact", async (req, res) => {
       results.forEach((r, index) => {
         const target = index === 0 ? "Admin Alert" : "Customer Ack";
         if (r.status === "rejected") {
-          console.error(`❌ [${target}] failed:`, r.reason?.message);
+          console.error(`❌ [${target}] failed:`, r.reason?.message || r.reason);
         } else {
           console.log(`📧 [${target}] dispatched successfully.`);
         }
@@ -161,7 +188,7 @@ app.post("/api/quotes", async (req, res) => {
       results.forEach((r, index) => {
         const target = index === 0 ? "Admin Alert" : "Customer RFQ Ack";
         if (r.status === "rejected") {
-          console.error(`❌ [${target}] failed:`, r.reason?.message);
+          console.error(`❌ [${target}] failed:`, r.reason?.message || r.reason);
         } else {
           console.log(`📧 [${target}] dispatched successfully.`);
         }
@@ -294,11 +321,7 @@ app.delete("/api/admin/inquiries/:id", protect, async (req, res) => {
   }
 });
 
-// ----------------------------------------------------
 // Product CRUD Endpoints
-// ----------------------------------------------------
-
-// 1. Public: Get All Active Products
 app.get("/api/products", async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 });
@@ -308,7 +331,6 @@ app.get("/api/products", async (req, res) => {
   }
 });
 
-// 2. Protected: Create New Product
 app.post("/api/admin/products", protect, async (req, res) => {
   try {
     const { name, category, pricePerUnit, moq, strength, dimensions, stockStatus, imageUrl, description } = req.body;
@@ -335,7 +357,6 @@ app.post("/api/admin/products", protect, async (req, res) => {
   }
 });
 
-// 3. Protected: Update Existing Product
 app.put("/api/admin/products/:id", protect, async (req, res) => {
   try {
     const updated = await Product.findByIdAndUpdate(req.params.id, req.body, {
@@ -351,7 +372,6 @@ app.put("/api/admin/products/:id", protect, async (req, res) => {
   }
 });
 
-// 4. Protected: Delete Product
 app.delete("/api/admin/products/:id", protect, async (req, res) => {
   try {
     const deleted = await Product.findByIdAndDelete(req.params.id);
@@ -359,6 +379,7 @@ app.delete("/api/admin/products/:id", protect, async (req, res) => {
 
     res.json({ success: true, message: "Product deleted successfully." });
   } catch (err) {
+    console.error("Delete product error:", err);
     res.status(500).json({ error: "Failed to delete product." });
   }
 });
