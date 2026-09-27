@@ -1,8 +1,8 @@
 import nodemailer from "nodemailer";
-import dns from "node:dns";
 
 export const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
+  // Direct Google IPv4 SMTP IP to bypass Render's broken IPv6 DNS resolution
+  host: "142.251.2.108",
   port: 587,
   secure: false, // STARTTLS
   auth: {
@@ -10,13 +10,11 @@ export const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS,
   },
   tls: {
+    // Explicit SNI servername so Gmail TLS certificate verifies correctly
+    servername: "smtp.gmail.com",
     rejectUnauthorized: false,
   },
-  // Force IPv4 lookup at the socket level
-  lookup: (hostname, options, callback) => {
-    dns.lookup(hostname, { family: 4 }, callback);
-  },
-  connectionTimeout: 20000,
+  connectionTimeout: 15000,
 });
 
 transporter.verify((error, success) => {
