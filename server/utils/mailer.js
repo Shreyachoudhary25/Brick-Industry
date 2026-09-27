@@ -1,13 +1,10 @@
 import nodemailer from "nodemailer";
-import dns from "dns";
-
-// Force Node DNS to prioritize IPv4 over IPv6 on Render
-dns.setDefaultResultOrder("ipv4first");
 
 export const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
-  secure: false, // true for 465, false for 587 (uses STARTTLS)
+  secure: false, // Use STARTTLS
+  family: 4,     // Explicitly forces IPv4 to eliminate Render ENETUNREACH errors
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -15,6 +12,7 @@ export const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false,
   },
+  connectionTimeout: 15000,
 });
 
 transporter.verify((error, success) => {
@@ -59,7 +57,7 @@ export const sendQuoteAlert = async (quote) => {
         <p><strong>Contact:</strong> ${quote.phone} | ${quote.email}</p>
         <p><strong>Product:</strong> ${quote.productName}</p>
         <p><strong>Quantity:</strong> ${quote.quantity} Units</p>
-        <p><strong>Delivery Location:</strong> ${quote.deliverySite}</p>
+        <p><strong>Delivery Site:</strong> ${quote.deliverySite}</p>
         <p><strong>Notes:</strong> ${quote.notes || "None"}</p>
       </div>
     `,
@@ -109,7 +107,6 @@ export const sendInquiryCustomerAck = async (contact) => {
 
   return transporter.sendMail(mailOptions);
 };
-
 
 export const sendQuoteCustomerAck = async (quote) => {
   if (!quote.email) return;
