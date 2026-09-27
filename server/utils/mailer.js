@@ -1,10 +1,10 @@
 import nodemailer from "nodemailer";
+import dns from "node:dns";
 
 export const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
-  secure: false, // Use STARTTLS
-  family: 4,     // Explicitly forces IPv4 to eliminate Render ENETUNREACH errors
+  secure: false, // STARTTLS
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -12,7 +12,11 @@ export const transporter = nodemailer.createTransport({
   tls: {
     rejectUnauthorized: false,
   },
-  connectionTimeout: 15000,
+  // Force IPv4 lookup at the socket level
+  lookup: (hostname, options, callback) => {
+    dns.lookup(hostname, { family: 4 }, callback);
+  },
+  connectionTimeout: 20000,
 });
 
 transporter.verify((error, success) => {
@@ -22,7 +26,6 @@ transporter.verify((error, success) => {
     console.log("✅ Nodemailer is connected and ready to send emails");
   }
 });
-
 export const sendInquiryAlert = async (contact) => {
   const mailOptions = {
     from: `"BrickWorks Alert" <${process.env.EMAIL_USER}>`,
